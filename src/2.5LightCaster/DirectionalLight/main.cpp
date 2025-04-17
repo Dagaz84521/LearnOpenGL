@@ -67,8 +67,8 @@ int main()
 
     glEnable(GL_DEPTH_TEST);
 
-    Shader lightingShader("Shader/2.4LightingMaps/LightingMaps.vs", "Shader/2.4LightingMaps/LightingMaps.fs");
-    Shader lightCubeShader("Shader/2.4LightingMaps/light_cube.vs", "Shader/2.4LightingMaps/light_cube.fs");
+    Shader lightingShader("Shader/2.5LightCaster/DirectionalLight/DirectionalLight.vs", "Shader/2.5LightCaster/DirectionalLight/DirectionalLight.fs");
+    Shader lightCubeShader("Shader/2.5LightCaster/DirectionalLight/light_cube.vs", "Shader/2.5LightCaster/DirectionalLight/light_cube.fs");
 
     float vertices[] = {
         // positions          // normals           // texture coords
@@ -114,6 +114,20 @@ int main()
         -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 0.0f,
         -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f
     };
+
+     // positions all containers
+     glm::vec3 cubePositions[] = {
+        glm::vec3( 0.0f,  0.0f,  0.0f),
+        glm::vec3( 2.0f,  5.0f, -15.0f),
+        glm::vec3(-1.5f, -2.2f, -2.5f),
+        glm::vec3(-3.8f, -2.0f, -12.3f),
+        glm::vec3( 2.4f, -0.4f, -3.5f),
+        glm::vec3(-1.7f,  3.0f, -7.5f),
+        glm::vec3( 1.3f, -2.0f, -2.5f),
+        glm::vec3( 1.5f,  2.0f, -2.5f),
+        glm::vec3( 1.5f,  0.2f, -1.5f),
+        glm::vec3(-1.3f,  1.0f, -1.5f)
+    };
     
     // 立方体
     unsigned int VBO, cubeVAO;
@@ -144,12 +158,10 @@ int main()
     // 加载纹理
     unsigned int diffuseMap = loadTexture("Texture/container2.png");
     unsigned int specularMap = loadTexture("Texture/container2_specular.png");
-    unsigned int emissionMap = loadTexture("Texture/matrix.jpg");
     // 着色器设置
     lightingShader.use();
     lightingShader.setInt("material.diffuse", 0);
     lightingShader.setInt("material.specular", 1);
-    lightingShader.setInt("material.emission", 2);
 
 
     // render loop
@@ -168,57 +180,52 @@ int main()
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        // 着色器设置
         lightingShader.use();
-        // 光源位置
-        lightingShader.setVec3("light.position", lightPos);
-        // 观察者位置
+        lightingShader.setVec3("light.direction", -0.2f, -1.0f, -0.3f);
         lightingShader.setVec3("viewPos", camera.Position);
 
-        // 光源设置
-        lightingShader.setVec3("light.ambient",  0.2f, 0.2f, 0.2f);
-        lightingShader.setVec3("light.diffuse",  0.5f, 0.5f, 0.5f); // 将光照调暗了一些以搭配场景
-        lightingShader.setVec3("light.specular", 1.0f, 1.0f, 1.0f); 
+        // 光源属性设置
+        lightingShader.setVec3("light.ambient", 0.2f, 0.2f, 0.2f);
+        lightingShader.setVec3("light.diffuse", 0.5f, 0.5f, 0.5f);
+        lightingShader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
 
-        // 材质设置
-        lightingShader.setFloat("material.shininess", 64.0f);
+        // 材质属性设置
+        lightingShader.setFloat("material.shininess", 32.0f);
 
-        
-
-        // view变换和projection变换
+        // view/prjection 矩阵设置
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
         lightingShader.setMat4("projection", projection);
         lightingShader.setMat4("view", view);
 
-        // 世界变换
+        // 变换矩阵设置
         glm::mat4 model = glm::mat4(1.0f);
         lightingShader.setMat4("model", model);
 
-        // 渲染方块
-        glBindVertexArray(cubeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-
-        // 渲染灯光立方体
-        lightCubeShader.use();
-        lightCubeShader.setMat4("projection", projection);
-        lightCubeShader.setMat4("view", view);
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, lightPos);
-        model = glm::scale(model, glm::vec3(0.2f));
-        lightCubeShader.setMat4("model", model);
-
+        // diffuse纹理设置
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, diffuseMap);
+
+        // specular纹理设置
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, emissionMap);
 
-        glBindVertexArray(lightCubeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        // 容器渲染
+        glBindVertexArray(cubeVAO);
+        for(int i=0; i<10; i++)
+        {
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, cubePositions[i]);
+            model = glm::rotate(model, glm::radians((20.0f * i)), glm::vec3(1.0f, 0.3f, 0.5f));
+            lightingShader.setMat4("model", model);
+
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
+
     }
 
     glDeleteVertexArrays(1, &cubeVAO);
