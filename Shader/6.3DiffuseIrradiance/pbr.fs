@@ -12,6 +12,8 @@ uniform vec3  albedo;
 uniform float metallic;
 uniform float roughness;
 uniform float ao;
+//IBL
+uniform samplerCube irradianceMap;
 
 uniform bool useIrradianceMap; // 是否使用环境光照贴图
 
@@ -84,9 +86,26 @@ void main()
         float NdotL = max(dot(N, L), 0.0);
         Lo += (kD * albedo / PI + specular) * radiance * NdotL; // 漫反射和镜面反射结合
     }
-    vec3 ambient = vec3(0.03) * albedo * ao; // 环境光照
-    vec3 color = ambient + Lo; // 最终颜色
+
+    vec3 kS = fresnelSchlick(max(dot(N, V), 0.0), F0); // 镜面反射部分
+    vec3 kD = vec3(1.0) - kS; // 漫反射部分
+    kD *= 1.0 - metallic; // 根据金属度调整漫反射部分
+
+    vec3 irradiance = texture(irradianceMap, N).rgb; // 从环境贴图获取辐照度
+    vec3 diffuse = albedo * irradiance; // 漫反射部分
     
+    vec3 ambient = vec3(0.0);
+    if(useIrradianceMap)
+    {
+        ambient = (kD * diffuse) * ao; // 使用irradiance贴图计算环境光照
+    }
+    else
+    {
+        ambient = (kD * albedo) * ao; // 没有irradiance贴图时使用albedo计算环境光照
+    }
+    // vec3 ambient = (kD * diffuse) * ao; // 环境光照
+    vec3 color = ambient + Lo; // 最终颜色
+
     color = color/(color + vec3(1.0)); // 色调映射
     color = pow(color, vec3(1.0 / 2.2)); // gamma校正
 
